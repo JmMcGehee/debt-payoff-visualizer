@@ -23,10 +23,5 @@ This project uses React and is open for contributions!
 - Advanced visualizations and scenario sharing
 - Export to PDF/image
 
-## License
-
-MIT
-
----
 
 *Empower your financial future—one payment at a time!*
