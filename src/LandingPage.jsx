@@ -272,7 +272,7 @@ export default function LandingPage({ onSubmit }) {
                   fontSize: '16px',
                   border: '1px solid #d1d5db',
                   borderRadius: '8px',
-                  width: '100%'
+                  width: '95%'
                 }}
               />
             </div>
