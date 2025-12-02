@@ -1,90 +1,137 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { calculateDebtPayoff } from "./utils/debtCalculator";
+import DebtGanttChart from "./components/DebtGanttChart";
+import MetricsHeader from "./components/MetricsHeader";
 
-/**
- * Props:
- * - debts (array)
- * - extraPayment
- * - payInterval
- * - onDebtOrderChange (user reorders debts)
- * - onExtraPaymentChange
- * - paymentSchedule (array, user customizes months)
- */
 export default function DashboardPage({
   debts,
   extraPayment,
   payInterval,
-  payoffResults,
-  onDebtOrderChange,
-  onExtraPaymentChange,
-  paymentSchedule,
 }) {
+  const [currentDebts, setCurrentDebts] = useState(debts);
+  const [currentExtraPayment, setCurrentExtraPayment] = useState(extraPayment);
+  const [calculationResults, setCalculationResults] = useState(null);
+
+  // Calculate debt payoff whenever debts or extra payment changes
+  useEffect(() => {
+    if (currentDebts && currentDebts.length > 0) {
+      const results = calculateDebtPayoff(currentDebts, currentExtraPayment);
+      setCalculationResults(results);
+    }
+  }, [currentDebts, currentExtraPayment]);
+
+  const handleStrategyChange = (strategy) => {
+    let reorderedDebts = [...currentDebts];
+    
+    if (strategy === 'snowball') {
+      // Smallest balance first
+      reorderedDebts.sort((a, b) => parseFloat(a.balance || a.amount) - parseFloat(b.balance || b.amount));
+    } else if (strategy === 'avalanche') {
+      // Highest interest first
+      reorderedDebts.sort((a, b) => parseFloat(b.rate) - parseFloat(a.rate));
+    }
+    
+    // Update order property
+    reorderedDebts = reorderedDebts.map((debt, index) => ({ ...debt, order: index }));
+    setCurrentDebts(reorderedDebts);
+  };
+
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page" style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
       <h1>Your Debt Payoff Timeline</h1>
-      <section className="summary">
-        <p>Estimated Debt-Free Date: <strong>{payoffResults.debtFreeDate}</strong></p>
-        <p>Total Interest Saved: <strong>${payoffResults.interestSaved}</strong></p>
-        <p>Projected Timeline: <strong>{payoffResults.months} months</strong></p>
-        <label>
-          Extra Payment:
-          <input
-            value={extraPayment}
-            type="number"
-            onChange={e => onExtraPaymentChange(e.target.value)}
+      
+      {calculationResults && (
+        <>
+          <MetricsHeader calculationResults={calculationResults} />
+          
+          <section className="extra-payment-control" style={{ marginBottom: '30px' }}>
+            <label style={{ fontSize: '16px', fontWeight: '500' }}>
+              Extra Payment Amount: 
+              <input
+                style={{ 
+                  marginLeft: '10px', 
+                  padding: '8px', 
+                  fontSize: '16px', 
+                  width: '150px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px'
+                }}
+                value={currentExtraPayment}
+                type="number"
+                onChange={e => setCurrentExtraPayment(parseFloat(e.target.value) || 0)}
+              />
+              <span style={{ marginLeft: '8px' }}>/ {payInterval}</span>
+            </label>
+          </section>
+
+          <DebtGanttChart 
+            debtTimeline={calculationResults.debtTimeline} 
+            startDate={new Date()}
           />
-        </label>
-      </section>
+        </>
+      )}
 
-      <section className="debt-order">
-        <h2>Drag debts to set your payoff priority</h2>
-        {/* TODO: Replace this with react-beautiful-dnd or dnd-kit for drag-and-drop */}
-        <ul>
-          {debts.map((debt, idx) => (
-            <li key={debt.id || idx}>
-              <span className="drag-handle">::</span>
-              {debt.name} - ${debt.amount} @ {debt.rate}% | Min: ${debt.minPayment}
-            </li>
+      <section className="debt-list" style={{ marginTop: '40px' }}>
+        <h2>Your Debts (in payoff order)</h2>
+        <div style={{ display: 'grid', gap: '15px', marginTop: '20px' }}>
+          {currentDebts.map((debt, idx) => (
+            <div 
+              key={idx} 
+              style={{
+                padding: '15px',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                backgroundColor: '#f9fafb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: '18px' }}>{idx + 1}. {debt.name}</strong>
+                <div style={{ color: '#6b7280', marginTop: '5px' }}>
+                  {debt.category} • ${parseFloat(debt.balance || debt.amount).toFixed(2)} @ {debt.rate}% • Min: ${debt.minPayment}
+                </div>
+              </div>
+            </div>
           ))}
-        </ul>
-      </section>
-
-      <section className="payoff-timeline">
-        <h2>Payoff Timeline</h2>
-        {/* TODO: Integrate chart library here (Recharts, Victory, or D3.js) */}
-        <div id="payoff-chart-placeholder">
-          {/* visual timeline/chart showing payoff periods */}
         </div>
       </section>
 
-      <section className="payment-schedule">
-        <h2>Customize Payment Schedule (optional)</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Total Paid</th>
-              <th>Extra Paid</th>
-              <th>Edit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* paymentSchedule.map(...) */}
-            <tr>
-              <td>Jan 2026</td>
-              <td>$2000</td>
-              <td>$500</td>
-              <td><button>Edit</button></td>
-            </tr>
-            {/* ...more months */}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="strategy-options">
-        <h2>Try Different Debt Ordering Strategies</h2>
-        <button onClick={() => {/* reorder: smallest balance first */}}>Smallest Debt First</button>
-        <button onClick={() => {/* reorder: highest interest first */}}>Highest Interest First</button>
-        <button onClick={() => {/* reorder: custom/user defined */}}>Custom Order</button>
+      <section className="strategy-options" style={{ marginTop: '40px', paddingBottom: '40px' }}>
+        <h2>Try Different Payoff Strategies</h2>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          <button 
+            onClick={() => handleStrategyChange('snowball')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Snowball (Smallest First)
+          </button>
+          <button 
+            onClick={() => handleStrategyChange('avalanche')}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            Avalanche (Highest Interest)
+          </button>
+        </div>
       </section>
     </div>
   );
